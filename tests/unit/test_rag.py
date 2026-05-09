@@ -1,15 +1,40 @@
-from app.retrieval.retriever import retrieve_documents
+from app.retrieval.retriever import (
+    retrieve_documents,
+)
 
 
-query = "AWS alerts stopped firing after credential update"
+def test_retrieval_returns_documents():
 
-results = retrieve_documents(query)
+    results = retrieve_documents(
+        query=(
+            "CloudWatch metrics "
+            "not syncing"
+        ),
+        top_k=3,
+    )
 
-for index, result in enumerate(results, start=1):
+    assert (
+        len(results) > 0
+    )
 
-    print(f"\nResult {index}")
-    print("=" * 50)
 
-    print(result["metadata"])
+def test_retrieved_documents_have_metadata():
 
-    print(result["content"][:500])
+    results = retrieve_documents(
+        query=(
+            "refund policy"
+        ),
+        top_k=2,
+    )
+
+    first_doc = results[0]
+
+    assert (
+        "metadata"
+        in first_doc
+    )
+
+    assert (
+        "filename"
+        in first_doc["metadata"]
+    )
