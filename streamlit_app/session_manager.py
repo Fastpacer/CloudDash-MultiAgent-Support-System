@@ -1,4 +1,5 @@
 import streamlit as st
+
 from uuid import uuid4
 
 
@@ -9,7 +10,46 @@ from uuid import uuid4
 def initialize_session():
 
     # -----------------------------------------------
-    # Conversation ID
+    # Authentication State
+    # -----------------------------------------------
+
+    if (
+        "authenticated"
+        not in st.session_state
+    ):
+
+        st.session_state.authenticated = (
+            False
+        )
+
+    # -----------------------------------------------
+    # Username
+    # -----------------------------------------------
+
+    if (
+        "username"
+        not in st.session_state
+    ):
+
+        st.session_state.username = (
+            None
+        )
+
+    # -----------------------------------------------
+    # User ID
+    # -----------------------------------------------
+
+    if (
+        "user_id"
+        not in st.session_state
+    ):
+
+        st.session_state.user_id = (
+            None
+        )
+
+    # -----------------------------------------------
+    # Active Conversation ID
     # -----------------------------------------------
 
     if (
@@ -31,6 +71,17 @@ def initialize_session():
     ):
 
         st.session_state.chat_history = []
+
+    # -----------------------------------------------
+    # Conversation History
+    # -----------------------------------------------
+
+    if (
+        "conversation_history"
+        not in st.session_state
+    ):
+
+        st.session_state.conversation_history = []
 
     # -----------------------------------------------
     # Trace History
@@ -55,3 +106,39 @@ def initialize_session():
         st.session_state.escalation_triggered = (
             False
         )
+
+
+# ---------------------------------------------------
+# Create New Conversation
+# ---------------------------------------------------
+
+def create_new_conversation():
+
+    st.session_state.conversation_id = (
+        str(uuid4())
+    )
+
+    st.session_state.chat_history = []
+
+
+# ---------------------------------------------------
+# Logout User
+# ---------------------------------------------------
+
+def logout_user():
+
+    st.session_state.authenticated = (
+        False
+    )
+
+    st.session_state.username = None
+
+    st.session_state.user_id = None
+
+    st.session_state.chat_history = []
+
+    st.session_state.conversation_history = []
+
+    st.session_state.conversation_id = (
+        str(uuid4())
+    )

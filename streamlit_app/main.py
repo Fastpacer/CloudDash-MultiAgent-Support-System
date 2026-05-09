@@ -7,7 +7,6 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
 
-
 import streamlit as st
 
 from app.orchestration.graph import (
@@ -55,9 +54,7 @@ from app.observability.tracing import (
 # ---------------------------------------------------
 
 st.set_page_config(
-    page_title=(
-        "CloudDash AI Support"
-    ),
+    page_title="CloudDash AI Support",
     page_icon="☁️",
     layout="wide",
 )
@@ -71,12 +68,122 @@ initialize_session()
 
 
 # ---------------------------------------------------
-# Render UI
+# Authentication State
+# ---------------------------------------------------
+
+if not st.session_state.get(
+    "authenticated",
+    False,
+):
+
+    st.title(
+        "☁️ CloudDash AI Support"
+    )
+
+    st.subheader(
+        "Login / Signup"
+    )
+
+    username = st.text_input(
+        "Username"
+    )
+
+    password = st.text_input(
+        "Password",
+        type="password",
+    )
+
+    col1, col2 = st.columns(2)
+
+    # -----------------------------------------------
+    # Login Button
+    # -----------------------------------------------
+
+    with col1:
+
+        if st.button(
+            "Login"
+        ):
+
+            if username and password:
+
+                st.session_state.authenticated = True
+
+                st.session_state.username = (
+                    username
+                )
+
+                st.rerun()
+
+    # -----------------------------------------------
+    # Signup Button
+    # -----------------------------------------------
+
+    with col2:
+
+        if st.button(
+            "Signup"
+        ):
+
+            if username and password:
+
+                st.session_state.authenticated = True
+
+                st.session_state.username = (
+                    username
+                )
+
+                st.rerun()
+
+    st.stop()
+
+
+# ---------------------------------------------------
+# Sidebar
 # ---------------------------------------------------
 
 render_sidebar()
 
+with st.sidebar:
+
+    st.success(
+        (
+            "Logged in as: "
+            f"{st.session_state.username}"
+        )
+    )
+
+    if st.button(
+        "Logout"
+    ):
+
+        st.session_state.clear()
+
+        st.rerun()
+
+
+# ---------------------------------------------------
+# Header
+# ---------------------------------------------------
+
 render_header()
+
+
+# ---------------------------------------------------
+# Conversation Header
+# ---------------------------------------------------
+
+st.caption(
+    (
+        "Conversation ID: "
+        f"{st.session_state.conversation_id}"
+    )
+)
+
+
+# ---------------------------------------------------
+# Render Chat History
+# ---------------------------------------------------
 
 render_chat_history()
 
@@ -153,8 +260,19 @@ if user_input:
         st.stop()
 
     # -----------------------------------------------
-    # Conversation State
+    # Build Conversation State
     # -----------------------------------------------
+
+    conversation_messages = []
+
+    for message in st.session_state.chat_history:
+
+        conversation_messages.append(
+            ConversationMessage(
+                role=message["role"],
+                content=message["content"],
+            )
+        )
 
     conversation_state = (
         ConversationState(
@@ -166,17 +284,12 @@ if user_input:
                 st.session_state
                 .conversation_id
             ),
-            messages=[
-                ConversationMessage(
-                    role="user",
-                    content=user_input,
-                )
-            ],
+            messages=conversation_messages,
         )
     )
 
     # -----------------------------------------------
-    # Workflow Execution
+    # Execute Workflow
     # -----------------------------------------------
 
     with st.spinner(
@@ -256,14 +369,11 @@ if user_input:
         if escalation_required:
 
             st.error(
-                (
-                    "⚠️ Escalation "
-                    "Required"
-                )
+                "⚠️ Escalation Required"
             )
 
     # -----------------------------------------------
-    # Persist Chat History
+    # Persist Assistant Response
     # -----------------------------------------------
 
     st.session_state.chat_history.append(
@@ -288,5 +398,8 @@ if user_input:
 
     logger.info(
         "streamlit_workflow_completed",
+        username=(
+            st.session_state.username
+        ),
         duration_seconds=duration,
     )
