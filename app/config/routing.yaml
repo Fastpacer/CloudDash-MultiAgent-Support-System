@@ -1,0 +1,30 @@
+routing:
+
+  technical_keywords:
+    - alerts
+    - integrations
+    - APIs
+    - SSO
+    - dashboards
+    - sync failures
+    - infrastructure
+    - monitoring
+    - cloudwatch
+    - metrics
+
+  billing_keywords:
+    - invoices
+    - refunds
+    - subscriptions
+    - upgrades
+    - pricing
+    - duplicate charges
+    - payment failures
+
+  escalation_keywords:
+    - legal
+    - lawsuit
+    - production outage
+    - severe frustration
+    - data loss
+    - manager

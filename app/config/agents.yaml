@@ -1,0 +1,31 @@
+agents:
+
+  triage_agent:
+    role: "workflow_orchestrator"
+    multi_intent: true
+
+  technical_agent:
+    role: "technical_support"
+
+    retrieval:
+      enabled: true
+      top_k: 4
+
+    escalation_enabled: true
+
+  billing_agent:
+    role: "billing_support"
+
+    retrieval:
+      enabled: true
+      top_k: 4
+
+    escalation_enabled: true
+
+  escalation_agent:
+    role: "human_escalation"
+
+    retrieval:
+      enabled: false
+
+    escalation_enabled: false

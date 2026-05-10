@@ -1,5 +1,13 @@
-from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional
+from typing import (
+    List,
+    Optional,
+)
+
+from pydantic import (
+    BaseModel,
+    Field,
+)
+
 from datetime import datetime
 
 
@@ -7,7 +15,9 @@ from datetime import datetime
 # Conversation Message
 # ---------------------------------------------------
 
-class ConversationMessage(BaseModel):
+class ConversationMessage(
+    BaseModel,
+):
 
     role: str
 
@@ -19,59 +29,96 @@ class ConversationMessage(BaseModel):
 
 
 # ---------------------------------------------------
+# Handover Event
+# ---------------------------------------------------
+
+class HandoverEvent(
+    BaseModel,
+):
+
+    timestamp: datetime = Field(
+        default_factory=datetime.utcnow
+    )
+
+    source_agent: str
+
+    target_agent: str
+
+    reason: str
+
+    context_snapshot: str
+
+
+# ---------------------------------------------------
 # Conversation State
 # ---------------------------------------------------
 
-class ConversationState(BaseModel):
-
-    # ---------------------------------------------------
-    # Core Metadata
-    # ---------------------------------------------------
+class ConversationState(
+    BaseModel,
+):
 
     trace_id: str
 
     conversation_id: str
 
-    created_at: datetime = Field(
-        default_factory=datetime.utcnow
-    )
-
-    # ---------------------------------------------------
-    # Active Agent
-    # ---------------------------------------------------
-
-    current_agent: str = "triage_agent"
-
-    # ---------------------------------------------------
-    # Messages
-    # ---------------------------------------------------
-
-    messages: List[ConversationMessage] = Field(
+    messages: List[
+        ConversationMessage
+    ] = Field(
         default_factory=list
     )
 
-    # ---------------------------------------------------
-    # Retrieval Metadata
-    # ---------------------------------------------------
+    # -----------------------------------------------
+    # Agent Workflow
+    # -----------------------------------------------
 
-    retrieved_docs: List[str] = Field(
+    current_agent: Optional[
+        str
+    ] = None
+
+    pending_agents: List[
+        str
+    ] = Field(
         default_factory=list
     )
 
-    # ---------------------------------------------------
-    # NLP Metadata
-    # ---------------------------------------------------
-
-    extracted_entities: Dict[str, Any] = Field(
-        default_factory=dict
+    completed_agents: List[
+        str
+    ] = Field(
+        default_factory=list
     )
 
-    current_intent: Optional[str] = None
+    # -----------------------------------------------
+    # Retrieval
+    # -----------------------------------------------
 
-    sentiment: Optional[str] = None
+    retrieved_docs: List[
+        str
+    ] = Field(
+        default_factory=list
+    )
 
-    # ---------------------------------------------------
+    # -----------------------------------------------
     # Escalation
-    # ---------------------------------------------------
+    # -----------------------------------------------
 
-    escalation_required: bool = False
+    escalation_required: bool = (
+        False
+    )
+
+    # -----------------------------------------------
+    # Handover Tracking
+    # -----------------------------------------------
+
+    handover_history: List[
+        HandoverEvent
+    ] = Field(
+        default_factory=list
+    )
+
+    # -----------------------------------------------
+    # Extracted Entities
+    # -----------------------------------------------
+
+    extracted_entities: dict = (
+        Field(default_factory=dict)
+    )

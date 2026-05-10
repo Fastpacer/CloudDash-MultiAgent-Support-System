@@ -1,0 +1,25 @@
+application:
+
+  name: "CloudDash Multi-Agent Support System"
+
+  environment: "production"
+
+retrieval:
+
+  default_top_k: 4
+
+  max_context_characters: 1200
+
+observability:
+
+  enable_tracing: true
+
+  enable_metrics: true
+
+guardrails:
+
+  hallucination_detection: true
+
+  input_validation: true
+
+  output_validation: true

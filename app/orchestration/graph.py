@@ -5,6 +5,7 @@ from langgraph.graph import (
 
 from app.orchestration.state import (
     ConversationState,
+    HandoverEvent,
 )
 
 from app.agents.triage_agent import (
@@ -23,22 +24,45 @@ from app.agents.escalation_agent import (
     EscalationAgent,
 )
 
+from app.observability.logger import (
+    logger,
+)
+
 
 # ---------------------------------------------------
-# Agent Instances
+# Agent Registry
 # ---------------------------------------------------
 
 triage_agent = TriageAgent()
 
-technical_agent = TechnicalAgent()
+technical_agent = (
+    TechnicalAgent()
+)
 
-billing_agent = BillingAgent()
+billing_agent = (
+    BillingAgent()
+)
 
-escalation_agent = EscalationAgent()
+escalation_agent = (
+    EscalationAgent()
+)
+
+
+AGENT_REGISTRY = {
+    "technical_agent": (
+        technical_agent
+    ),
+    "billing_agent": (
+        billing_agent
+    ),
+    "escalation_agent": (
+        escalation_agent
+    ),
+}
 
 
 # ---------------------------------------------------
-# Nodes
+# Triage Node
 # ---------------------------------------------------
 
 def triage_node(
@@ -50,56 +74,125 @@ def triage_node(
     )
 
 
-def technical_node(
+# ---------------------------------------------------
+# Workflow Executor Node
+# ---------------------------------------------------
+
+def workflow_node(
     state: ConversationState,
 ):
 
-    return technical_agent.process(
-        state
+    logger.info(
+        "workflow_execution_started",
+        workflow=(
+            state.pending_agents
+        ),
     )
 
-
-def billing_node(
-    state: ConversationState,
-):
-
-    return billing_agent.process(
-        state
+    previous_agent = (
+        "triage_agent"
     )
 
+    # -----------------------------------------------
+    # Sequential Agent Execution
+    # -----------------------------------------------
 
-def escalation_node(
-    state: ConversationState,
-):
+    for agent_name in (
+        state.pending_agents
+    ):
 
-    return escalation_agent.process(
-        state
+        agent = (
+            AGENT_REGISTRY.get(
+                agent_name
+            )
+        )
+
+        # -------------------------------------------
+        # Missing Agent Fallback
+        # -------------------------------------------
+
+        if not agent:
+
+            logger.warning(
+                "unknown_agent_detected",
+                target_agent=(
+                    agent_name
+                ),
+            )
+
+            continue
+
+        # -------------------------------------------
+        # Handover Logging
+        # -------------------------------------------
+
+        handover_event = (
+            HandoverEvent(
+                source_agent=(
+                    previous_agent
+                ),
+                target_agent=(
+                    agent_name
+                ),
+                reason=(
+                    "workflow_transition"
+                ),
+                context_snapshot=(
+                    state.messages[-1]
+                    .content[:500]
+                ),
+            )
+        )
+
+        state.handover_history.append(
+            handover_event
+        )
+
+        logger.info(
+            "handover_completed",
+            source_agent=(
+                previous_agent
+            ),
+            target_agent=(
+                agent_name
+            ),
+            trace_id=(
+                state.trace_id
+            ),
+        )
+
+        # -------------------------------------------
+        # Execute Agent
+        # -------------------------------------------
+
+        state.current_agent = (
+            agent_name
+        )
+
+        state = agent.process(
+            state
+        )
+
+        state.completed_agents.append(
+            agent_name
+        )
+
+        previous_agent = (
+            agent_name
+        )
+
+    logger.info(
+        "workflow_execution_completed",
+        completed_agents=(
+            state.completed_agents
+        ),
     )
+
+    return state
 
 
 # ---------------------------------------------------
-# Conditional Routing
-# ---------------------------------------------------
-
-def route_after_triage(
-    state: ConversationState,
-):
-
-    if state.current_agent == "technical_agent":
-
-        return "technical"
-
-    elif state.current_agent == "billing_agent":
-
-        return "billing"
-
-    else:
-
-        return "escalation"
-
-
-# ---------------------------------------------------
-# Build Graph
+# Build Workflow Graph
 # ---------------------------------------------------
 
 workflow = StateGraph(
@@ -112,46 +205,21 @@ workflow.add_node(
 )
 
 workflow.add_node(
-    "technical",
-    technical_node,
-)
-
-workflow.add_node(
-    "billing",
-    billing_node,
-)
-
-workflow.add_node(
-    "escalation",
-    escalation_node,
+    "workflow_executor",
+    workflow_node,
 )
 
 workflow.set_entry_point(
     "triage"
 )
 
-workflow.add_conditional_edges(
+workflow.add_edge(
     "triage",
-    route_after_triage,
-    {
-        "technical": "technical",
-        "billing": "billing",
-        "escalation": "escalation",
-    },
+    "workflow_executor",
 )
 
 workflow.add_edge(
-    "technical",
-    END,
-)
-
-workflow.add_edge(
-    "billing",
-    END,
-)
-
-workflow.add_edge(
-    "escalation",
+    "workflow_executor",
     END,
 )
 
