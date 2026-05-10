@@ -1,13 +1,24 @@
-from pydantic import BaseModel, Field
-from typing import List
-from datetime import datetime
+from pydantic import (
+    BaseModel,
+    Field,
+)
+
+from typing import (
+    List,
+)
+
+from datetime import (
+    datetime,
+)
 
 
 # ---------------------------------------------------
 # Incoming Chat Request
 # ---------------------------------------------------
 
-class MessageRequest(BaseModel):
+class MessageRequest(
+    BaseModel
+):
 
     message: str
 
@@ -18,26 +29,46 @@ class MessageRequest(BaseModel):
 # Chat Response
 # ---------------------------------------------------
 
-class MessageResponse(BaseModel):
+class MessageResponse(
+    BaseModel
+):
 
     response: str
 
     active_agent: str
 
-    citations: List[str] = Field(
+    citations: List[
+        str
+    ] = Field(
         default_factory=list
     )
 
-    escalation_required: bool = False
+    escalation_required: bool = (
+        False
+    )
 
     trace_id: str
+
+    # -----------------------------------------------
+    # Workflow Visibility
+    # -----------------------------------------------
+
+    completed_agents: List[
+        str
+    ] = Field(
+        default_factory=list
+    )
+
+    handover_count: int = 0
 
 
 # ---------------------------------------------------
 # Conversation Initialization
 # ---------------------------------------------------
 
-class ConversationStartResponse(BaseModel):
+class ConversationStartResponse(
+    BaseModel
+):
 
     conversation_id: str
 
@@ -50,7 +81,9 @@ class ConversationStartResponse(BaseModel):
 # Health Check
 # ---------------------------------------------------
 
-class HealthResponse(BaseModel):
+class HealthResponse(
+    BaseModel
+):
 
     status: str
 

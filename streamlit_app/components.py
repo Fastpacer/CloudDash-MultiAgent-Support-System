@@ -40,7 +40,8 @@ def render_sidebar():
 - Multi-Agent Orchestration
 - Hybrid Retrieval
 - BM25 + Dense Search
-- Cross-Encoder Reranking
+- Cross-Agent Handovers
+- Workflow Orchestration
 - Guardrails
 - Conversation Memory
 - Observability
@@ -61,6 +62,22 @@ def render_sidebar():
 - API Rate Limits
 - Cloud Integrations
 - Escalation Handling
+"""
+        )
+
+        st.divider()
+
+        st.subheader(
+            "Workflow Features"
+        )
+
+        st.markdown(
+            """
+- Multi-Intent Detection
+- Sequential Agent Routing
+- Contextual Handovers
+- Workflow Aggregation
+- Persistent Conversations
 """
         )
 
@@ -111,4 +128,94 @@ def render_trace_id(
 
     st.caption(
         f"Trace ID: {trace_id}"
+    )
+
+
+# ---------------------------------------------------
+# Workflow Renderer
+# ---------------------------------------------------
+
+def render_workflow(
+    completed_agents,
+):
+
+    if completed_agents:
+
+        st.markdown(
+            "### Workflow Execution"
+        )
+
+        workflow_display = (
+            " → ".join(
+                [
+                    (
+                        agent
+                        .replace(
+                            "_agent",
+                            ""
+                        )
+                        .replace(
+                            "_",
+                            " "
+                        )
+                        .title()
+                    )
+                    for agent in (
+                        completed_agents
+                    )
+                ]
+            )
+        )
+
+        st.info(
+            workflow_display
+        )
+
+
+# ---------------------------------------------------
+# Handover Renderer
+# ---------------------------------------------------
+
+def render_handover_count(
+    handover_count,
+):
+
+    st.caption(
+        (
+            f"🔄 Handover Events: "
+            f"{handover_count}"
+        )
+    )
+
+
+# ---------------------------------------------------
+# Agent Badge Renderer
+# ---------------------------------------------------
+
+def render_agent_badge(
+    active_agent,
+):
+
+    agent_mapping = {
+
+        "technical_agent":
+            "🛠 Technical Agent",
+
+        "billing_agent":
+            "💳 Billing Agent",
+
+        "escalation_agent":
+            "🚨 Escalation Agent",
+
+        "triage_agent":
+            "🧠 Triage Agent",
+    }
+
+    badge = agent_mapping.get(
+        active_agent,
+        active_agent,
+    )
+
+    st.success(
+        f"Active Agent: {badge}"
     )

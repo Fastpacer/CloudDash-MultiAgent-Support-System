@@ -6,6 +6,7 @@ from langgraph.graph import (
 from app.orchestration.state import (
     ConversationState,
     HandoverEvent,
+    ConversationMessage,
 )
 
 from app.agents.triage_agent import (
@@ -47,7 +48,6 @@ escalation_agent = (
     EscalationAgent()
 )
 
-
 AGENT_REGISTRY = {
     "technical_agent": (
         technical_agent
@@ -87,11 +87,20 @@ def workflow_node(
         workflow=(
             state.pending_agents
         ),
+        trace_id=(
+            state.trace_id
+        ),
     )
 
     previous_agent = (
         "triage_agent"
     )
+
+    # -----------------------------------------------
+    # Aggregated Workflow Responses
+    # -----------------------------------------------
+
+    workflow_responses = []
 
     # -----------------------------------------------
     # Sequential Agent Execution
@@ -169,9 +178,43 @@ def workflow_node(
             agent_name
         )
 
+        pre_message_count = len(
+            state.messages
+        )
+
         state = agent.process(
             state
         )
+
+        # -------------------------------------------
+        # Extract Newly Generated Messages
+        # -------------------------------------------
+
+        new_messages = (
+            state.messages[
+                pre_message_count:
+            ]
+        )
+
+        for msg in new_messages:
+
+            if msg.role == "assistant":
+
+                formatted_response = (
+                    f"\n\n"
+                    f"=== "
+                    f"{agent_name.upper()} "
+                    f"===\n\n"
+                    f"{msg.content}"
+                )
+
+                workflow_responses.append(
+                    formatted_response
+                )
+
+        # -------------------------------------------
+        # Completed Agent Tracking
+        # -------------------------------------------
 
         state.completed_agents.append(
             agent_name
@@ -181,10 +224,35 @@ def workflow_node(
             agent_name
         )
 
+    # -----------------------------------------------
+    # Final Workflow Synthesis
+    # -----------------------------------------------
+
+    if workflow_responses:
+
+        combined_response = (
+            "\n".join(
+                workflow_responses
+            )
+        )
+
+        state.messages.append(
+            ConversationMessage(
+                role="assistant",
+                content=combined_response,
+            )
+        )
+
     logger.info(
         "workflow_execution_completed",
         completed_agents=(
             state.completed_agents
+        ),
+        total_handovers=len(
+            state.handover_history
+        ),
+        trace_id=(
+            state.trace_id
         ),
     )
 

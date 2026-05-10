@@ -1,5 +1,7 @@
 from fastapi import APIRouter
+
 from uuid import uuid4
+
 from datetime import datetime
 
 from app.orchestration.graph import (
@@ -60,7 +62,8 @@ async def root():
 
     return {
         "message": (
-            "CloudDash Multi-Agent Support System API"
+            "CloudDash Multi-Agent "
+            "Support System API"
         )
     }
 
@@ -170,6 +173,8 @@ async def chat_endpoint(
             citations=[],
             escalation_required=False,
             trace_id=trace_id,
+            completed_agents=[],
+            handover_count=0,
         )
 
     # ---------------------------------------------------
@@ -183,7 +188,9 @@ async def chat_endpoint(
     logger.info(
         "conversation_history_loaded",
         trace_id=trace_id,
-        history_length=len(history),
+        history_length=len(
+            history
+        ),
     )
 
     # ---------------------------------------------------
@@ -225,7 +232,9 @@ async def chat_endpoint(
     # Persist Messages
     # ---------------------------------------------------
 
-    for message in result["messages"]:
+    for message in result[
+        "messages"
+    ]:
 
         save_message(
             conversation_id,
@@ -245,7 +254,8 @@ async def chat_endpoint(
     # ---------------------------------------------------
 
     final_message = (
-        result["messages"][-1].content
+        result["messages"][-1]
+        .content
     )
 
     # ---------------------------------------------------
@@ -263,6 +273,14 @@ async def chat_endpoint(
         active_agent=result[
             "current_agent"
         ],
+        completed_agents=result[
+            "completed_agents"
+        ],
+        handover_count=len(
+            result[
+                "handover_history"
+            ]
+        ),
     )
 
     # ---------------------------------------------------
@@ -271,10 +289,32 @@ async def chat_endpoint(
 
     return MessageResponse(
         response=final_message,
-        active_agent=result["current_agent"],
-        citations=result["retrieved_docs"],
+
+        active_agent=result[
+            "current_agent"
+        ],
+
+        citations=result[
+            "retrieved_docs"
+        ],
+
         escalation_required=result[
             "escalation_required"
         ],
+
         trace_id=trace_id,
+
+        # -----------------------------------------------
+        # Workflow Visibility
+        # -----------------------------------------------
+
+        completed_agents=result[
+            "completed_agents"
+        ],
+
+        handover_count=len(
+            result[
+                "handover_history"
+            ]
+        ),
     )
