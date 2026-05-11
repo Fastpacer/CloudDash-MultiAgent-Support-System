@@ -2,6 +2,10 @@ import streamlit as st
 
 from uuid import uuid4
 
+from app.memory.session_manager import (
+    load_user_conversations,
+)
+
 
 # ---------------------------------------------------
 # Initialize Session State
@@ -141,4 +145,23 @@ def logout_user():
 
     st.session_state.conversation_id = (
         str(uuid4())
+    )
+
+
+# ---------------------------------------------------
+# Load User Conversations To Session
+# ---------------------------------------------------
+
+def load_user_conversations_to_session(
+    username: str,
+):
+
+    conversations = (
+        load_user_conversations(
+            username
+        )
+    )
+
+    st.session_state.conversation_history = (
+        conversations
     )

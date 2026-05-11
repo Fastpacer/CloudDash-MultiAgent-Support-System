@@ -23,6 +23,7 @@ This system demonstrates advanced AI/ML engineering patterns including:
 - **Graceful Escalation**: Routes complex issues to human operators with structured context
 - **Hybrid Search**: Combines dense (vector) and sparse (BM25) retrieval for comprehensive results
 - **Re-ranking**: Prioritizes most relevant documents using contextual re-ranking
+- **Multi-Tenant Support**: Per-user conversation persistence with automatic history loading on re-login
 
 ### 🛡️ Safety & Quality
 
@@ -100,6 +101,165 @@ streamlit run streamlit_app/app.py
 ```
 
 Access the UI: http://localhost:8501
+
+## Multi-Tenant Conversation Memory
+
+### Overview
+
+The system now includes **persistent, user-scoped conversation memory** that enables multi-tenant support. When users log in with credentials, the system automatically retrieves all their previous conversations, maintaining full context isolation between users.
+
+### How It Works
+
+1. **User Authentication**: Login/Signup validates credentials and retrieves user profile
+2. **Conversation History Loading**: Upon successful authentication, all user's previous conversations are loaded into the session
+3. **Per-User Storage**: Each conversation is stored in a user-specific directory hierarchy
+4. **Automatic Persistence**: Every message (user and assistant) is automatically saved and linked to the authenticated user
+5. **Session Re-use**: Users can select previous conversations to resume and continue the dialogue
+
+### Files Modified for Multi-Tenant Support
+
+#### Core Memory Layer
+
+| File | Changes |
+|------|---------|
+| [app/memory/conversation_store.py](app/memory/conversation_store.py) | **User-scoped storage paths**: Added `get_user_conversation_dir()` function; updated `get_conversation_path()` to accept username; modified `save_message()` and `load_conversation_history()` to work with user folders; renamed `list_conversations()` → `list_user_conversations()` for per-user retrieval |
+| [app/memory/session_manager.py](app/memory/session_manager.py) | **User lifecycle**: Already had `authenticate_user()`, `register_user()`, and `load_user_conversations()` functions; added `attach_conversation_to_user()` to link conversations to user profiles |
+
+#### API Layer
+
+| File | Changes |
+|------|---------|
+| [app/api/schemas.py](app/api/schemas.py) | **Added username context**: Added `username: str` field to `MessageRequest` class for API calls |
+| [app/api/routes.py](app/api/routes.py) | **Endpoint updates**: Updated `/conversation/start` to accept username and call `attach_conversation_to_user()`; updated `/chat` endpoint to extract username from request, pass it to memory functions, and ensure messages are linked to the authenticated user |
+
+#### Streamlit UI Layer
+
+| File | Changes |
+|------|---------|
+| [streamlit_app/main.py](streamlit_app/main.py) | **Enhanced auth flow**: Added real credential validation using `authenticate_user()` and `register_user()`; added `load_user_conversations_to_session()` call on login; added message persistence for both user and assistant messages via `save_message()` with username context; improved login/signup UI with success/error feedback |
+| [streamlit_app/session_manager.py](streamlit_app/session_manager.py) | **Session initialization**: Added `load_user_conversations_to_session()` function to populate conversation history from disk after authentication |
+| [streamlit_app/chat_ui.py](streamlit_app/chat_ui.py) | **User-scoped retrieval**: Updated `load_conversation_history()` calls to include username parameter for retrieving user-specific conversations |
+
+### Storage Structure
+
+The new storage hierarchy isolates conversations by user:
+
+```
+data/
+├── users/
+│   ├── user1.json              # User profile with conversation list
+│   │   {
+│   │     "user_id": "uuid",
+│   │     "username": "user1",
+│   │     "password": "hashed",
+│   │     "conversations": ["conv-id-1", "conv-id-2"]
+│   │   }
+│   └── user2.json              # Another user's profile
+│
+└── conversations/
+    ├── user1/
+    │   └── conversations/
+    │       ├── conv-id-1.json   # First conversation
+    │       │   [
+    │       │     {"role": "user", "content": "...", "timestamp": "..."},
+    │       │     {"role": "assistant", "content": "...", "timestamp": "..."}
+    │       │   ]
+    │       └── conv-id-2.json   # Second conversation
+    │
+    └── user2/
+        └── conversations/
+            └── conv-id-3.json   # User2's conversation
+```
+
+### Authentication Flow
+
+```
+┌─────────────┐
+│  User Login │
+└──────┬──────┘
+       │
+       ▼
+┌──────────────────────┐
+│ Validate Credentials │ (authenticate_user)
+└──────┬───────────────┘
+       │
+       ├─ Success ─────────────────┐
+       │                           │
+       │                      ┌────▼──────────────────┐
+       │                      │ Load User Profile &   │
+       │                      │ Conversation List     │
+       │                      │ (load_user_convers...)│
+       │                      └────┬──────────────────┘
+       │                           │
+       │                      ┌────▼──────────────────┐
+       │                      │ Populate Session     │
+       │                      │ State                 │
+       │                      └────┬──────────────────┘
+       │                           │
+       │                      ┌────▼──────────────────┐
+       │                      │ User Ready to Chat   │
+       │                      │ Previous convos      │
+       │                      │ available to resume  │
+       │                      └──────────────────────┘
+       │
+       └─ Failure ─────► Show Error Message
+```
+
+### Runtime Data Flow
+
+```
+USER INPUT
+    │
+    ▼
+Save to Disk (username, conv_id)
+    │
+    ▼
+Execute Workflow (agents, retrieval, etc.)
+    │
+    ▼
+ASSISTANT RESPONSE
+    │
+    ▼
+Save to Disk (username, conv_id)
+    │
+    ▼
+Update User Session
+    │
+    ▼
+Display in Chat UI
+```
+
+### API Usage Example
+
+**Start Conversation** (now with username):
+```bash
+POST /conversation/start?username=john_doe
+```
+
+**Send Message** (now includes username):
+```bash
+POST /chat
+{
+  "username": "john_doe",
+  "conversation_id": "conv-123e4567",
+  "message": "My alerts are not firing"
+}
+```
+
+**Resume Previous Conversation**:
+```bash
+# Streamlit UI automatically loads user's conversations on login
+# Users can click on previous conversation from sidebar to resume
+```
+
+### Key Features
+
+✅ **User Isolation**: Each user's conversations are completely isolated  
+✅ **Automatic Persistence**: No manual save needed; every message is persisted  
+✅ **Session Management**: Conversations survive browser refreshes and re-logins  
+✅ **Conversation Threading**: Easy to resume previous conversations from history  
+✅ **Scalable Architecture**: Prepared for migration to centralized databases (PostgreSQL, MongoDB)  
+✅ **Backward Compatible**: Existing API calls still work; username is added for multi-tenant support  
 
 ## API Documentation
 
@@ -419,9 +579,18 @@ The system is designed to handle the following scenarios:
 │   │   ├── context_builder.py   # Context summarization
 │   │   ├── audit_logger.py      # Handover event logging
 │   │   └── summarizer.py        # Conversation summarization
-│   ├── memory/                  # Conversation memory
-│   │   ├── conversation_store.py # In-memory conversation storage
-│   │   └── session_manager.py   # Session lifecycle management
+│   ├── memory/                  # Multi-tenant conversation memory
+│   │   ├── conversation_store.py # User-scoped conversation storage (file-based)
+│   │   │                          # - get_user_conversation_dir(): Create user dir
+│   │   │                          # - get_conversation_path(): User-scoped paths
+│   │   │                          # - save_message(): Persist to user folder
+│   │   │                          # - load_conversation_history(): Load from user folder
+│   │   │                          # - list_user_conversations(): List user's convos
+│   │   └── session_manager.py   # Session & user lifecycle management
+│   │                             # - authenticate_user(): Validate credentials
+│   │                             # - register_user(): Create new user profile
+│   │                             # - attach_conversation_to_user(): Link convo to user
+│   │                             # - load_user_conversations(): Retrieve user's history
 │   ├── guardrails/              # Safety & quality checks
 │   │   ├── input_guard.py       # Prompt injection detection
 │   │   ├── output_guard.py      # Response validation & citation check
@@ -436,11 +605,17 @@ The system is designed to handle the following scenarios:
 │       ├── exceptions.py        # Custom exceptions
 │       └── helpers.py           # Utility functions
 │
-├── streamlit_app/               # Streamlit web UI
-│   ├── app.py                   # Main Streamlit app
-│   ├── chat_ui.py               # Chat interface components
-│   ├── components.py            # Reusable UI components
+├── streamlit_app/               # Streamlit web UI with multi-tenant support
+│   ├── main.py                  # Main app with enhanced auth & persistence
+│   │                             # - authenticate_user(): Validate login
+│   │                             # - register_user(): Create new account
+│   │                             # - load_user_conversations_to_session(): Load history
+│   │                             # - save_message(): Persist messages per user
+│   ├── chat_ui.py               # Chat interface components (user-scoped)
+│   │                             # - load_conversation_history(): User-scoped retrieval
 │   ├── session_manager.py       # Streamlit session management
+│   │                             # - load_user_conversations_to_session(): Init history
+│   ├── components.py            # Reusable UI components
 │   └── config.toml              # Streamlit configuration
 │
 ├── knowledge_base/              # KB documents (ingested into vector store)
@@ -449,6 +624,19 @@ The system is designed to handle the following scenarios:
 │   ├── billing/
 │   ├── api_docs/
 │   └── account_access/
+│
+├── data/                        # Multi-tenant data (auto-created)
+│   ├── users/                   # User profiles & conversation metadata
+│   │   ├── user1.json          # Stores user_id, username, hashed_password, conversation list
+│   │   └── user2.json
+│   └── conversations/           # Per-user conversation storage
+│       ├── user1/
+│       │   └── conversations/
+│       │       ├── conv-id-1.json
+│       │       └── conv-id-2.json
+│       └── user2/
+│           └── conversations/
+│               └── conv-id-3.json
 │
 ├── chroma_db/                   # Persisted Chroma vector store
 │
@@ -472,9 +660,10 @@ For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
 1. **LangGraph for Orchestration**: Provides declarative state machine for agent routing and transitions
 2. **Hybrid Retrieval**: Combines vector embeddings (semantic) with BM25 (keyword) for comprehensive search
 3. **Structured State**: Pydantic models enforce type safety across agent boundaries
-4. **In-Memory Conversation Store**: Fast development-grade storage (upgrade to persistent DB for production)
+4. **Multi-Tenant Persistent Memory**: File-based user-scoped conversation storage with automatic history loading
 5. **Configuration-Driven Agents**: YAML-based routing and agent definitions for extensibility
 6. **Structured JSON Logging**: Integration-ready for observability platforms
+7. **Automatic Message Persistence**: Every message persists to disk with user context for conversation continuity
 
 ## Environment Variables
 
@@ -556,6 +745,32 @@ The core orchestration logic remains unchanged—no need to modify existing code
 - Add more diverse KB documents covering edge cases
 - Implement query rewriting for better embeddings
 
+### Multi-Tenant Conversation Memory Issues
+
+#### Conversations Not Persisting
+- Check that `data/conversations/` directory exists and has write permissions
+- Verify `data/users/` directory is created with user profiles
+- Ensure username is passed correctly to API endpoints
+- Check application logs for permission errors
+
+#### Previous Conversations Not Loading on Re-login
+- Verify user credentials are correct during login
+- Check that `load_user_conversations_to_session()` is called after authentication
+- Ensure `data/users/{username}.json` contains valid conversation list
+- Clear browser cache/cookies if session state is corrupted
+
+#### User Seeing Another User's Conversations
+- **Security Issue**: Verify `get_user_conversation_dir()` is properly scoping to username
+- Check that `load_conversation_history()` is called with correct username
+- Inspect file permissions in `data/conversations/` directory
+- Review authentication flow in `streamlit_app/main.py`
+
+#### Message Not Appearing in Chat History
+- Verify `save_message()` is being called with correct username and conversation_id
+- Check `data/conversations/{username}/conversations/{conversation_id}.json` exists
+- Ensure message has both `role` and `content` fields
+- Review error logs for write permission issues
+
 ## Performance Considerations
 
 - **Batch Processing**: Implement conversation batching for high throughput
@@ -569,12 +784,13 @@ The core orchestration logic remains unchanged—no need to modify existing code
 
 - Conversation-aware retrieval using historical context
 - Long-term memory summarization
-- Redis-backed persistent memory
+- Redis-backed persistent memory (upgrade from file-based storage)
 - Streaming token responses
 - Advanced hallucination detection
 - Feedback-driven retrieval optimization
 - Human-in-the-loop escalation workflows
-- Multi-tenant session isolation
+- ✅ Multi-tenant session isolation **(IMPLEMENTED)**
+- Database migration: PostgreSQL/MongoDB for production-scale deployments
 - Analytics dashboard for observability metrics
 - Role-aware contextual retrieval
 

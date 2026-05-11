@@ -20,6 +20,7 @@ from app.orchestration.state import (
 
 from streamlit_app.session_manager import (
     initialize_session,
+    load_user_conversations_to_session,
 )
 
 from streamlit_app.components import (
@@ -29,6 +30,16 @@ from streamlit_app.components import (
 
 from streamlit_app.chat_ui import (
     render_chat_history,
+)
+
+from app.memory.session_manager import (
+    authenticate_user,
+    register_user,
+    load_user_conversations,
+)
+
+from app.memory.conversation_store import (
+    save_message,
 )
 
 from app.guardrails.input_guard import (
@@ -107,13 +118,44 @@ if not st.session_state.get(
 
             if username and password:
 
-                st.session_state.authenticated = True
-
-                st.session_state.username = (
-                    username
+                user_data = authenticate_user(
+                    username,
+                    password,
                 )
 
-                st.rerun()
+                if user_data:
+
+                    st.session_state.authenticated = True
+
+                    st.session_state.username = (
+                        username
+                    )
+
+                    st.session_state.user_id = (
+                        user_data["user_id"]
+                    )
+
+                    load_user_conversations_to_session(
+                        username
+                    )
+
+                    st.success(
+                        "Login successful!"
+                    )
+
+                    st.rerun()
+
+                else:
+
+                    st.error(
+                        "Invalid username or password"
+                    )
+
+            else:
+
+                st.warning(
+                    "Please enter username and password"
+                )
 
     # -----------------------------------------------
     # Signup Button
@@ -127,13 +169,45 @@ if not st.session_state.get(
 
             if username and password:
 
-                st.session_state.authenticated = True
-
-                st.session_state.username = (
-                    username
+                success = register_user(
+                    username,
+                    password,
                 )
 
-                st.rerun()
+                if success:
+
+                    st.session_state.authenticated = True
+
+                    st.session_state.username = (
+                        username
+                    )
+
+                    user_data = authenticate_user(
+                        username,
+                        password,
+                    )
+
+                    st.session_state.user_id = (
+                        user_data["user_id"]
+                    )
+
+                    st.success(
+                        "Account created successfully!"
+                    )
+
+                    st.rerun()
+
+                else:
+
+                    st.error(
+                        "Username already exists"
+                    )
+
+            else:
+
+                st.warning(
+                    "Please enter username and password"
+                )
 
     st.stop()
 
@@ -222,6 +296,19 @@ if user_input:
             "role": "user",
             "content": user_input,
         }
+    )
+
+    # -----------------------------------------------
+    # Persist User Message
+    # -----------------------------------------------
+
+    save_message(
+        st.session_state.username,
+        st.session_state.conversation_id,
+        ConversationMessage(
+            role="user",
+            content=user_input,
+        ),
     )
 
     # -----------------------------------------------
@@ -386,6 +473,15 @@ if user_input:
                 escalation_required
             ),
         }
+    )
+
+    save_message(
+        st.session_state.username,
+        st.session_state.conversation_id,
+        ConversationMessage(
+            role="assistant",
+            content=assistant_response,
+        ),
     )
 
     # -----------------------------------------------

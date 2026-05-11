@@ -24,6 +24,8 @@ class MessageRequest(
 
     conversation_id: str
 
+    username: str
+
 
 # ---------------------------------------------------
 # Chat Response

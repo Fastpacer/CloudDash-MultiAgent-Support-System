@@ -31,6 +31,7 @@ from app.memory.conversation_store import (
 
 from app.memory.session_manager import (
     create_conversation_id,
+    attach_conversation_to_user,
 )
 
 from app.observability.metrics import (
@@ -94,13 +95,20 @@ async def health_check():
     response_model=ConversationStartResponse,
     tags=["Conversation"],
 )
-async def start_conversation():
+async def start_conversation(
+    username: str,
+):
 
     conversation_id = (
         create_conversation_id()
     )
 
     trace_id = str(uuid4())
+
+    attach_conversation_to_user(
+        username,
+        conversation_id,
+    )
 
     return ConversationStartResponse(
         conversation_id=conversation_id,
@@ -138,10 +146,13 @@ async def chat_endpoint(
         request.conversation_id
     )
 
+    username = request.username
+
     logger.info(
         "chat_request_received",
         trace_id=trace_id,
         conversation_id=conversation_id,
+        username=username,
     )
 
     # ---------------------------------------------------
@@ -182,6 +193,7 @@ async def chat_endpoint(
     # ---------------------------------------------------
 
     history = load_conversation_history(
+        username,
         conversation_id
     )
 
@@ -237,8 +249,14 @@ async def chat_endpoint(
     ]:
 
         save_message(
+            username,
             conversation_id,
             message,
+        )
+
+        attach_conversation_to_user(
+            username,
+            conversation_id,
         )
 
     logger.info(
