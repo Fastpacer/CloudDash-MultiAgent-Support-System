@@ -303,7 +303,6 @@ if user_input:
     # -----------------------------------------------
 
     save_message(
-        st.session_state.username,
         st.session_state.conversation_id,
         ConversationMessage(
             role="user",
@@ -476,7 +475,6 @@ if user_input:
     )
 
     save_message(
-        st.session_state.username,
         st.session_state.conversation_id,
         ConversationMessage(
             role="assistant",

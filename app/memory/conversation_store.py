@@ -22,42 +22,15 @@ BASE_DIR.mkdir(
 
 
 # ---------------------------------------------------
-# Get User Conversation Directory
-# ---------------------------------------------------
-
-def get_user_conversation_dir(
-    username: str,
-):
-
-    user_dir = (
-        BASE_DIR
-        / username
-        / "conversations"
-    )
-
-    user_dir.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    return user_dir
-
-
-# ---------------------------------------------------
 # Get Conversation File Path
 # ---------------------------------------------------
 
 def get_conversation_path(
-    username: str,
     conversation_id: str,
 ):
 
-    user_dir = get_user_conversation_dir(
-        username
-    )
-
     return (
-        user_dir
+        BASE_DIR
         / f"{conversation_id}.json"
     )
 
@@ -67,19 +40,16 @@ def get_conversation_path(
 # ---------------------------------------------------
 
 def save_message(
-    username: str,
     conversation_id: str,
     message: ConversationMessage,
 ):
 
     path = get_conversation_path(
-        username,
         conversation_id
     )
 
     existing_messages = (
         load_conversation_history(
-            username,
             conversation_id
         )
     )
@@ -120,12 +90,10 @@ def save_message(
 # ---------------------------------------------------
 
 def load_conversation_history(
-    username: str,
     conversation_id: str,
 ):
 
     path = get_conversation_path(
-        username,
         conversation_id
     )
 
@@ -158,20 +126,14 @@ def load_conversation_history(
 
 
 # ---------------------------------------------------
-# List User Conversations
+# List Conversations
 # ---------------------------------------------------
 
-def list_user_conversations(
-    username: str,
-):
-
-    user_dir = get_user_conversation_dir(
-        username
-    )
+def list_conversations():
 
     conversations = []
 
-    for file in user_dir.glob(
+    for file in BASE_DIR.glob(
         "*.json"
     ):
 

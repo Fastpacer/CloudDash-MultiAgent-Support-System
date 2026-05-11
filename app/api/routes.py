@@ -193,7 +193,6 @@ async def chat_endpoint(
     # ---------------------------------------------------
 
     history = load_conversation_history(
-        username,
         conversation_id
     )
 
@@ -249,7 +248,6 @@ async def chat_endpoint(
     ]:
 
         save_message(
-            username,
             conversation_id,
             message,
         )

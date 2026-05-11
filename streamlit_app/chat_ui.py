@@ -68,7 +68,6 @@ def render_conversation_sidebar():
 
                 history = (
                     load_conversation_history(
-                        st.session_state.username,
                         conversation_id
                     )
                 )
