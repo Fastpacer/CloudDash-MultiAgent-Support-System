@@ -165,3 +165,5 @@ def load_user_conversations_to_session(
     st.session_state.conversation_history = (
         conversations
     )
+
+    return conversations
