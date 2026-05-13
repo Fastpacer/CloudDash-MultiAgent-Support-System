@@ -121,8 +121,8 @@ User Question:
         # ---------------------------------------------------
 
         query = (
-            state.messages[-1]
-            .content
+              self.agent_name,
+              state.messages[-1].content,
         )
 
         logger.info(

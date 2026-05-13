@@ -41,34 +41,70 @@ class TriageAgent(
             ]
         )
 
+        # ---------------------------------------------------
+        # Advanced Triage Prompt
+        # ---------------------------------------------------
+
         self.prompt = (
             ChatPromptTemplate
             .from_template(
                 f"""
-You are the CloudDash Triage Agent.
+You are the CloudDash Workflow Triage Agent.
 
-Identify ALL relevant support domains.
+Your responsibilities:
+1. Detect ALL relevant support domains
+2. Decide which agents should participate
+3. Create a focused task for EACH agent
 
-ROUTING RULES:
+AVAILABLE AGENTS:
 
-Technical Keywords:
+technical_agent
+- infrastructure
+- APIs
+- SSO
+- dashboards
+- monitoring
+- sync failures
+
+billing_agent
+- subscriptions
+- pricing
+- invoices
+- enterprise upgrades
+- licensing
+
+escalation_agent
+- unclear requests
+- unsupported workflows
+- missing KB coverage
+
+ROUTING KEYWORDS:
+
+Technical:
 {routing_rules["technical_keywords"]}
 
-Billing Keywords:
+Billing:
 {routing_rules["billing_keywords"]}
 
-Escalation Keywords:
+Escalation:
 {routing_rules["escalation_keywords"]}
 
 IMPORTANT:
-- Multiple intents allowed
-- Return comma-separated agent names
-- No explanations
+- Multiple agents allowed
+- Assign ONLY domain-specific tasks
+- Avoid overlap between agents
+- Keep tasks concise
+- Do NOT let billing agents diagnose infrastructure
+- Do NOT let technical agents discuss pricing
 
-VALID AGENTS:
-technical_agent
-billing_agent
-escalation_agent
+OUTPUT FORMAT EXACTLY:
+
+AGENTS:
+technical_agent,billing_agent
+
+TASKS:
+technical_agent: Diagnose dashboard latency issue
+billing_agent: Evaluate enterprise upgrade implications
 
 User Message:
 {{message}}
@@ -106,31 +142,139 @@ User Message:
             }
         )
 
-        raw_routes = (
-            response.content
-            .strip()
-            .lower()
+        raw_response = (
+            response.content.strip()
         )
 
-        routes = [
-            route.strip()
-            for route in (
-                raw_routes.split(",")
+        logger.info(
+            "triage_raw_response",
+            response=raw_response,
+        )
+
+        # ---------------------------------------------------
+        # Parse AGENTS Section
+        # ---------------------------------------------------
+
+        cleaned_routes = []
+
+        agent_tasks = {}
+
+        try:
+
+            sections = (
+                raw_response.split(
+                    "TASKS:"
+                )
             )
-            if route.strip()
-        ]
 
-        valid_agents = {
-            "technical_agent",
-            "billing_agent",
-            "escalation_agent",
-        }
+            agents_section = (
+                sections[0]
+            )
 
-        cleaned_routes = [
-            route
-            for route in routes
-            if route in valid_agents
-        ]
+            tasks_section = (
+                sections[1]
+                if len(sections) > 1
+                else ""
+            )
+
+            # -----------------------------------------------
+            # Extract Agents
+            # -----------------------------------------------
+
+            if (
+                "AGENTS:"
+                in agents_section
+            ):
+
+                agent_text = (
+                    agents_section
+                    .replace(
+                        "AGENTS:",
+                        ""
+                    )
+                    .strip()
+                )
+
+                routes = [
+                    route.strip()
+                    for route in (
+                        agent_text.split(",")
+                    )
+                    if route.strip()
+                ]
+
+            else:
+
+                routes = []
+
+            valid_agents = {
+
+                "technical_agent",
+
+                "billing_agent",
+
+                "escalation_agent",
+            }
+
+            cleaned_routes = [
+
+                route
+
+                for route in routes
+
+                if route in valid_agents
+            ]
+
+            # -----------------------------------------------
+            # Extract Agent Tasks
+            # -----------------------------------------------
+
+            task_lines = (
+                tasks_section
+                .strip()
+                .splitlines()
+            )
+
+            for line in task_lines:
+
+                if ":" not in line:
+
+                    continue
+
+                agent_name, task = (
+                    line.split(
+                        ":",
+                        1,
+                    )
+                )
+
+                agent_name = (
+                    agent_name.strip()
+                )
+
+                task = (
+                    task.strip()
+                )
+
+                if (
+                    agent_name
+                    in valid_agents
+                ):
+
+                    agent_tasks[
+                        agent_name
+                    ] = task
+
+        except Exception as e:
+
+            logger.warning(
+                "triage_parsing_failed",
+                error=str(e),
+            )
+
+        # ---------------------------------------------------
+        # Fallback Routing
+        # ---------------------------------------------------
 
         if not cleaned_routes:
 
@@ -138,8 +282,23 @@ User Message:
                 "escalation_agent"
             ]
 
+            agent_tasks[
+                "escalation_agent"
+            ] = (
+                "Handle unsupported "
+                "or ambiguous request."
+            )
+
+        # ---------------------------------------------------
+        # Update State
+        # ---------------------------------------------------
+
         state.pending_agents = (
             cleaned_routes
+        )
+
+        state.agent_tasks = (
+            agent_tasks
         )
 
         state.current_agent = (
@@ -150,6 +309,9 @@ User Message:
             "triage_completed",
             workflow=(
                 cleaned_routes
+            ),
+            tasks=(
+                agent_tasks
             ),
         )
 
