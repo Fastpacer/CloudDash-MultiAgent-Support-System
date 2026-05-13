@@ -4,11 +4,23 @@ from pathlib import Path
 
 
 # ---------------------------------------------------
-# Base Config Directory
+# Resolve Project Root
 # ---------------------------------------------------
 
-CONFIG_DIR = Path(
-    "config"
+BASE_DIR = (
+    Path(__file__)
+    .resolve()
+    .parent
+    .parent
+    .parent
+)
+
+# ---------------------------------------------------
+# Config Directory
+# ---------------------------------------------------
+
+CONFIG_DIR = (
+    BASE_DIR / "config"
 )
 
 
@@ -23,6 +35,15 @@ def load_yaml_config(
     config_path = (
         CONFIG_DIR / filename
     )
+
+    if not config_path.exists():
+
+        raise FileNotFoundError(
+            (
+                f"YAML config file not found: "
+                f"{config_path}"
+            )
+        )
 
     with open(
         config_path,
