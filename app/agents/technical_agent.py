@@ -44,42 +44,63 @@ class TechnicalAgent(
 
         self.llm = get_llm()
 
+        # ---------------------------------------------------
+        # Technical-Only Scoped Prompt
+        # ---------------------------------------------------
+
         self.prompt = (
             ChatPromptTemplate.from_template(
                 """
 You are CloudDash Enterprise Technical Support.
 
-Your responsibilities:
-- diagnose cloud platform issues
-- provide operational troubleshooting
-- use ONLY verified KB information
-- avoid hallucinations
-- remain concise and technical
+You ONLY handle:
+- infrastructure failures
+- dashboard issues
+- monitoring systems
+- SSO authentication
+- API failures
+- sync failures
+- integrations
+- cloud platform troubleshooting
+- operational diagnostics
+
+IMPORTANT:
+Ignore ALL billing-related topics including:
+- subscriptions
+- upgrades
+- pricing
+- invoices
+- refunds
+- payment issues
+
+If the user asks BOTH technical and billing questions:
+ONLY answer the technical portions.
 
 STRICT RULES:
 - Use ONLY the provided KB context
 - Never invent infrastructure details
 - Never speculate
+- Never discuss billing
+- Never answer pricing questions
 - Never say "I think", "maybe", or "possibly"
-- Do not ask unnecessary follow-up questions
-- Keep responses under 180 words unless necessary
-- If KB lacks information, explicitly state that verified information was unavailable
+- Keep responses concise and technical
+- If KB lacks information, explicitly state that verified technical information was unavailable
 
 RESPONSE FORMAT:
 
-Issue Summary:
-- concise diagnosis
+Technical Diagnosis:
+- concise technical issue summary
 
-Likely Cause:
-- root cause explanation
+Technical Root Cause:
+- infrastructure or configuration explanation
 
-Resolution Steps:
+Technical Resolution Steps:
 1. Step one
 2. Step two
 3. Step three
 
-Verification:
-- expected confirmation behavior
+Technical Verification:
+- expected technical confirmation behavior
 
 Context:
 {context}
@@ -217,7 +238,7 @@ User Question:
         ):
 
             logger.warning(
-                "output_guardrail_triggered",
+                "technical_guardrail_triggered",
                 reason=reason,
                 hallucination=(
                     possible_hallucination
@@ -229,8 +250,8 @@ User Question:
 
             generated_response = (
                 "Unable to provide a fully "
-                "verified response from the "
-                "current knowledge base."
+                "verified technical response "
+                "from the current knowledge base."
             )
 
         # ---------------------------------------------------

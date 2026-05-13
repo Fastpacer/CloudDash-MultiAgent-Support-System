@@ -2,6 +2,10 @@ from datetime import (
     datetime,
 )
 
+from langchain_core.prompts import (
+    ChatPromptTemplate,
+)
+
 from langgraph.graph import (
     StateGraph,
     END,
@@ -27,6 +31,10 @@ from app.agents.billing_agent import (
 
 from app.agents.escalation_agent import (
     EscalationAgent,
+)
+
+from app.utils.llm_factory import (
+    get_llm,
 )
 
 from app.observability.logger import (
@@ -66,6 +74,40 @@ AGENT_REGISTRY = {
         escalation_agent
     ),
 }
+
+
+# ---------------------------------------------------
+# Synthesis LLM
+# ---------------------------------------------------
+
+synthesis_llm = get_llm()
+
+synthesis_prompt = (
+    ChatPromptTemplate.from_template(
+        """
+You are the CloudDash Workflow Synthesis Engine.
+
+Your job is to combine multiple specialized
+agent outputs into ONE unified enterprise
+support response.
+
+IMPORTANT:
+- Remove redundancy
+- Merge overlapping information
+- Preserve technical accuracy
+- Keep the response concise
+- Produce ONE coherent answer
+- Do NOT mention internal orchestration
+- Do NOT label sections by agent names
+
+The final answer should feel like:
+ONE intelligent enterprise assistant.
+
+Agent Outputs:
+{agent_outputs}
+"""
+    )
+)
 
 
 # ---------------------------------------------------
@@ -241,23 +283,47 @@ def workflow_node(
         )
 
     # -----------------------------------------------
-    # Response Synthesis
+    # Collect Agent Outputs
     # -----------------------------------------------
 
-    synthesized_sections = []
+    raw_outputs = []
 
     for output in (
         state.agent_outputs
     ):
 
-        synthesized_sections.append(
-            output.response
+        formatted_output = (
+            f"{output.agent_name}:\n"
+            f"{output.response}"
         )
 
-    synthesized_response = (
-        "\n\n".join(
-            synthesized_sections
+        raw_outputs.append(
+            formatted_output
         )
+
+    combined_outputs = (
+        "\n\n".join(
+            raw_outputs
+        )
+    )
+
+    # -----------------------------------------------
+    # LLM Synthesis Step
+    # -----------------------------------------------
+
+    synthesis_chain = (
+        synthesis_prompt
+        | synthesis_llm
+    )
+
+    synthesized_response = (
+        synthesis_chain.invoke(
+            {
+                "agent_outputs": (
+                    combined_outputs
+                )
+            }
+        ).content.strip()
     )
 
     # -----------------------------------------------
@@ -272,8 +338,21 @@ def workflow_node(
         state.completed_agents
     ):
 
+        cleaned_agent = (
+            agent_name
+            .replace(
+                "_agent",
+                ""
+            )
+            .replace(
+                "_",
+                " "
+            )
+            .title()
+        )
+
         agents_section += (
-            f"- {agent_name}\n"
+            f"- {cleaned_agent}\n"
         )
 
     # -----------------------------------------------
@@ -334,8 +413,8 @@ def workflow_node(
     )
 
     logger.info(
-        "workflow_execution_completed",
-        completed_agents=(
+        "workflow_synthesis_completed",
+        agents_invoked=(
             state.completed_agents
         ),
         total_handovers=(
