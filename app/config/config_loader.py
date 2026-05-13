@@ -20,7 +20,7 @@ BASE_DIR = (
 # ---------------------------------------------------
 
 CONFIG_DIR = (
-    BASE_DIR / "config"
+    BASE_DIR / "app" /"config"
 )
 
 
