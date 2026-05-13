@@ -14,8 +14,9 @@ def render_header():
     st.caption(
         (
             "Enterprise AI Support System "
-            "with Hybrid RAG, Guardrails, "
-            "Memory, and Multi-Agent Routing"
+            "with Multi-Agent Orchestration, "
+            "Hybrid Retrieval, Guardrails, "
+            "Persistent Memory, and Workflow Visibility"
         )
     )
 
@@ -31,20 +32,20 @@ def render_sidebar():
     with st.sidebar:
 
         st.header(
-            "System Overview"
+            "System Architecture"
         )
 
         st.markdown(
             """
-### Active Capabilities
+### Core Capabilities
 - Multi-Agent Orchestration
-- Hybrid Retrieval
+- Hybrid Retrieval Pipeline
 - BM25 + Dense Search
-- Cross-Agent Handovers
-- Workflow Orchestration
+- Contextual Handovers
+- Workflow Aggregation
 - Guardrails
-- Conversation Memory
-- Observability
+- Persistent Conversations
+- Observability + Tracing
 """
         )
 
@@ -61,24 +62,34 @@ def render_sidebar():
 - SSO Troubleshooting
 - API Rate Limits
 - Cloud Integrations
-- Escalation Handling
+- Escalation Management
 """
         )
 
         st.divider()
 
         st.subheader(
-            "Workflow Features"
+            "Workflow Engine"
         )
 
         st.markdown(
             """
 - Multi-Intent Detection
-- Sequential Agent Routing
-- Contextual Handovers
-- Workflow Aggregation
-- Persistent Conversations
+- Sequential Agent Execution
+- Shared Workflow State
+- Context Preservation
+- Workflow Synthesis
 """
+        )
+
+        st.divider()
+
+        st.caption(
+            (
+                "Built with LangGraph, "
+                "Hybrid RAG, and "
+                "Multi-Agent Routing"
+            )
         )
 
 
@@ -90,44 +101,10 @@ def render_escalation_banner():
 
     st.error(
         (
-            "⚠️ Escalation Required: "
+            "⚠️ Escalation Required\n\n"
             "This request may require "
             "human support intervention."
         )
-    )
-
-
-# ---------------------------------------------------
-# Citation Renderer
-# ---------------------------------------------------
-
-def render_citations(
-    citations,
-):
-
-    if citations:
-
-        with st.expander(
-            "Sources"
-        ):
-
-            for citation in citations:
-
-                st.markdown(
-                    f"- {citation}"
-                )
-
-
-# ---------------------------------------------------
-# Trace Information
-# ---------------------------------------------------
-
-def render_trace_id(
-    trace_id: str,
-):
-
-    st.caption(
-        f"Trace ID: {trace_id}"
     )
 
 
@@ -139,37 +116,129 @@ def render_workflow(
     completed_agents,
 ):
 
-    if completed_agents:
+    if not completed_agents:
 
-        st.markdown(
-            "### Workflow Execution"
-        )
+        return
 
-        workflow_display = (
-            " → ".join(
-                [
-                    (
-                        agent
-                        .replace(
-                            "_agent",
-                            ""
-                        )
-                        .replace(
-                            "_",
-                            " "
-                        )
-                        .title()
-                    )
-                    for agent in (
-                        completed_agents
-                    )
-                ]
+    formatted_agents = []
+
+    for agent in completed_agents:
+
+        cleaned_agent = (
+            agent
+            .replace(
+                "_agent",
+                ""
             )
+            .replace(
+                "_",
+                " "
+            )
+            .title()
         )
+
+        formatted_agents.append(
+            cleaned_agent
+        )
+
+    workflow_display = (
+        " → ".join(
+            formatted_agents
+        )
+    )
+
+    with st.expander(
+        "Workflow Execution",
+        expanded=False,
+    ):
 
         st.info(
             workflow_display
         )
+
+
+# ---------------------------------------------------
+# Agents Invoked Renderer
+# ---------------------------------------------------
+
+def render_agents_used(
+    completed_agents,
+):
+
+    if not completed_agents:
+
+        return
+
+    with st.expander(
+        "Agents Invoked",
+        expanded=False,
+    ):
+
+        for agent in completed_agents:
+
+            cleaned_agent = (
+                agent
+                .replace(
+                    "_agent",
+                    ""
+                )
+                .replace(
+                    "_",
+                    " "
+                )
+                .title()
+            )
+
+            st.markdown(
+                f"- {cleaned_agent}"
+            )
+
+
+# ---------------------------------------------------
+# Citation Renderer
+# ---------------------------------------------------
+
+def render_citations(
+    citations,
+):
+
+    if not citations:
+
+        return
+
+    unique_citations = sorted(
+        list(set(citations))
+    )
+
+    with st.expander(
+        "Sources",
+        expanded=False,
+    ):
+
+        for citation in (
+            unique_citations
+        ):
+
+            st.markdown(
+                f"- {citation}"
+            )
+
+
+# ---------------------------------------------------
+# Trace Information
+# ---------------------------------------------------
+
+def render_trace_id(
+    trace_id: str,
+):
+
+    if not trace_id:
+
+        return
+
+    st.caption(
+        f"Trace ID: {trace_id}"
+    )
 
 
 # ---------------------------------------------------
@@ -180,9 +249,16 @@ def render_handover_count(
     handover_count,
 ):
 
+    if (
+        handover_count
+        is None
+    ):
+
+        return
+
     st.caption(
         (
-            f"🔄 Handover Events: "
+            f"🔄 Workflow Handovers: "
             f"{handover_count}"
         )
     )
@@ -195,6 +271,10 @@ def render_handover_count(
 def render_agent_badge(
     active_agent,
 ):
+
+    if not active_agent:
+
+        return
 
     agent_mapping = {
 
@@ -211,11 +291,48 @@ def render_agent_badge(
             "🧠 Triage Agent",
     }
 
-    badge = agent_mapping.get(
-        active_agent,
-        active_agent,
+    badge = (
+        agent_mapping.get(
+            active_agent,
+            active_agent,
+        )
     )
 
     st.success(
-        f"Active Agent: {badge}"
+        f"Primary Agent: {badge}"
     )
+
+
+# ---------------------------------------------------
+# Workflow Metrics Renderer
+# ---------------------------------------------------
+
+def render_workflow_metrics(
+    total_agents,
+    total_handovers,
+):
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        st.metric(
+            "Agents Invoked",
+            total_agents,
+        )
+
+    with col2:
+
+        st.metric(
+            "Handovers",
+            total_handovers,
+        )
+
+
+# ---------------------------------------------------
+# Divider Renderer
+# ---------------------------------------------------
+
+def render_response_divider():
+
+    st.divider()

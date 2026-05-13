@@ -1,6 +1,7 @@
 from typing import (
     List,
     Optional,
+    Dict,
 )
 
 from pydantic import (
@@ -50,6 +51,25 @@ class HandoverEvent(
 
 
 # ---------------------------------------------------
+# Agent Output
+# ---------------------------------------------------
+
+class AgentOutput(
+    BaseModel,
+):
+
+    agent_name: str
+
+    response: str
+
+    citations: List[
+        str
+    ] = Field(
+        default_factory=list
+    )
+
+
+# ---------------------------------------------------
 # Conversation State
 # ---------------------------------------------------
 
@@ -57,9 +77,17 @@ class ConversationState(
     BaseModel,
 ):
 
+    # -----------------------------------------------
+    # Core Identity
+    # -----------------------------------------------
+
     trace_id: str
 
     conversation_id: str
+
+    # -----------------------------------------------
+    # Messages
+    # -----------------------------------------------
 
     messages: List[
         ConversationMessage
@@ -83,6 +111,16 @@ class ConversationState(
 
     completed_agents: List[
         str
+    ] = Field(
+        default_factory=list
+    )
+
+    # -----------------------------------------------
+    # Agent Outputs
+    # -----------------------------------------------
+
+    agent_outputs: List[
+        AgentOutput
     ] = Field(
         default_factory=list
     )
@@ -119,6 +157,24 @@ class ConversationState(
     # Extracted Entities
     # -----------------------------------------------
 
-    extracted_entities: dict = (
+    extracted_entities: Dict = (
         Field(default_factory=dict)
     )
+
+    # -----------------------------------------------
+    # Workflow Metadata
+    # -----------------------------------------------
+
+    workflow_started_at: datetime = (
+        Field(
+            default_factory=datetime.utcnow
+        )
+    )
+
+    workflow_completed_at: Optional[
+        datetime
+    ] = None
+
+    total_handovers: int = 0
+
+    total_agents_invoked: int = 0

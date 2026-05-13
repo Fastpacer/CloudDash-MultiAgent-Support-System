@@ -1,10 +1,14 @@
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import (
+    ChatPromptTemplate,
+)
 
-from app.agents.base_agent import BaseAgent
+from app.agents.base_agent import (
+    BaseAgent,
+)
 
 from app.orchestration.state import (
     ConversationState,
-    ConversationMessage,
+    AgentOutput,
 )
 
 from app.guardrails.output_guard import (
@@ -28,7 +32,9 @@ from app.observability.logger import (
 )
 
 
-class TechnicalAgent(BaseAgent):
+class TechnicalAgent(
+    BaseAgent
+):
 
     def __init__(self):
 
@@ -38,8 +44,9 @@ class TechnicalAgent(BaseAgent):
 
         self.llm = get_llm()
 
-        self.prompt = ChatPromptTemplate.from_template(
-            """
+        self.prompt = (
+            ChatPromptTemplate.from_template(
+                """
 You are CloudDash Enterprise Technical Support.
 
 Your responsibilities:
@@ -80,6 +87,7 @@ Context:
 User Question:
 {question}
 """
+            )
         )
 
     def process(
@@ -92,21 +100,26 @@ User Question:
         # ---------------------------------------------------
 
         query = (
-            state.messages[-1].content
+            state.messages[-1]
+            .content
         )
 
         logger.info(
             "technical_agent_started",
-            trace_id=state.trace_id,
+            trace_id=(
+                state.trace_id
+            ),
         )
 
         # ---------------------------------------------------
-        # Hybrid Retrieval Pipeline
+        # Hybrid Retrieval
         # ---------------------------------------------------
 
-        retrieved_docs = retrieve_documents(
-            query=query,
-            top_k=4,
+        retrieved_docs = (
+            retrieve_documents(
+                query=query,
+                top_k=4,
+            )
         )
 
         # ---------------------------------------------------
@@ -115,12 +128,29 @@ User Question:
 
         citations = list(
             {
-                doc["metadata"]["filename"]
-                for doc in retrieved_docs
+                doc["metadata"][
+                    "filename"
+                ]
+                for doc in (
+                    retrieved_docs
+                )
             }
         )
 
-        state.retrieved_docs = citations
+        # ---------------------------------------------------
+        # Shared Retrieval Tracking
+        # ---------------------------------------------------
+
+        for citation in citations:
+
+            if (
+                citation
+                not in state.retrieved_docs
+            ):
+
+                state.retrieved_docs.append(
+                    citation
+                )
 
         # ---------------------------------------------------
         # Context Compression
@@ -129,7 +159,9 @@ User Question:
         context = "\n\n".join(
             [
                 doc["content"][:1200]
-                for doc in retrieved_docs
+                for doc in (
+                    retrieved_docs
+                )
             ]
         )
 
@@ -137,7 +169,10 @@ User Question:
         # LLM Generation
         # ---------------------------------------------------
 
-        chain = self.prompt | self.llm
+        chain = (
+            self.prompt
+            | self.llm
+        )
 
         response = chain.invoke(
             {
@@ -146,18 +181,28 @@ User Question:
             }
         )
 
+        generated_response = (
+            response.content.strip()
+        )
+
         # ---------------------------------------------------
         # Output Guardrails
         # ---------------------------------------------------
 
-        is_safe, reason = validate_output(
-            response=response.content,
-            citations=citations,
+        is_safe, reason = (
+            validate_output(
+                response=(
+                    generated_response
+                ),
+                citations=citations,
+            )
         )
 
         possible_hallucination = (
             detect_possible_hallucination(
-                response=response.content,
+                response=(
+                    generated_response
+                ),
                 citations=citations,
             )
         )
@@ -177,41 +222,30 @@ User Question:
                 hallucination=(
                     possible_hallucination
                 ),
+                trace_id=(
+                    state.trace_id
+                ),
             )
 
-            safe_response = (
+            generated_response = (
                 "Unable to provide a fully "
                 "verified response from the "
                 "current knowledge base."
             )
 
-            response.content = safe_response
-
         # ---------------------------------------------------
-        # Append Citations
+        # Structured Agent Output
         # ---------------------------------------------------
 
-        citation_text = "\n\nSources:\n"
-
-        for citation in citations:
-
-            citation_text += (
-                f"- {citation}\n"
-            )
-
-        final_response = (
-            response.content.strip()
-            + citation_text
-        )
-
-        # ---------------------------------------------------
-        # Store Assistant Message
-        # ---------------------------------------------------
-
-        state.messages.append(
-            ConversationMessage(
-                role="assistant",
-                content=final_response,
+        state.agent_outputs.append(
+            AgentOutput(
+                agent_name=(
+                    self.agent_name
+                ),
+                response=(
+                    generated_response
+                ),
+                citations=citations,
             )
         )
 
@@ -220,7 +254,12 @@ User Question:
             retrieved_documents=len(
                 retrieved_docs
             ),
-            citations=len(citations),
+            citations=len(
+                citations
+            ),
+            trace_id=(
+                state.trace_id
+            ),
         )
 
         return state

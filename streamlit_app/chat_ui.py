@@ -1,9 +1,24 @@
 import streamlit as st
 
 from streamlit_app.components import (
+
     render_citations,
+
     render_trace_id,
+
     render_escalation_banner,
+
+    render_workflow,
+
+    render_agents_used,
+
+    render_handover_count,
+
+    render_agent_badge,
+
+    render_workflow_metrics,
+
+    render_response_divider,
 )
 
 from app.memory.conversation_store import (
@@ -54,6 +69,12 @@ def render_conversation_sidebar():
             )
         )
 
+        if not conversations:
+
+            st.caption(
+                "No previous conversations"
+            )
+
         for conversation_id in conversations:
 
             button_label = (
@@ -72,6 +93,10 @@ def render_conversation_sidebar():
                     )
                 )
 
+                # -----------------------------------
+                # Restore Conversation
+                # -----------------------------------
+
                 st.session_state.chat_history = []
 
                 for message in history:
@@ -81,8 +106,51 @@ def render_conversation_sidebar():
                             "role": (
                                 message.role
                             ),
+
                             "content": (
                                 message.content
+                            ),
+
+                            "trace_id": getattr(
+                                message,
+                                "trace_id",
+                                "N/A",
+                            ),
+
+                            "citations": getattr(
+                                message,
+                                "citations",
+                                [],
+                            ),
+
+                            "completed_agents": getattr(
+                                message,
+                                "completed_agents",
+                                [],
+                            ),
+
+                            "handover_count": getattr(
+                                message,
+                                "handover_count",
+                                0,
+                            ),
+
+                            "active_agent": getattr(
+                                message,
+                                "active_agent",
+                                None,
+                            ),
+
+                            "total_agents": getattr(
+                                message,
+                                "total_agents",
+                                0,
+                            ),
+
+                            "escalation_required": getattr(
+                                message,
+                                "escalation_required",
+                                False,
                             ),
                         }
                     )
@@ -108,6 +176,10 @@ def render_chat_history():
             chat["role"]
         ):
 
+            # ---------------------------------------
+            # Main Response
+            # ---------------------------------------
+
             st.markdown(
                 chat["content"]
             )
@@ -121,12 +193,82 @@ def render_chat_history():
                 == "assistant"
             ):
 
+                render_response_divider()
+
+                # -----------------------------------
+                # Workflow
+                # -----------------------------------
+
+                render_workflow(
+                    chat.get(
+                        "completed_agents",
+                        [],
+                    )
+                )
+
+                # -----------------------------------
+                # Agents Used
+                # -----------------------------------
+
+                render_agents_used(
+                    chat.get(
+                        "completed_agents",
+                        [],
+                    )
+                )
+
+                # -----------------------------------
+                # Workflow Metrics
+                # -----------------------------------
+
+                render_workflow_metrics(
+                    total_agents=chat.get(
+                        "total_agents",
+                        0,
+                    ),
+
+                    total_handovers=chat.get(
+                        "handover_count",
+                        0,
+                    ),
+                )
+
+                # -----------------------------------
+                # Active Agent
+                # -----------------------------------
+
+                render_agent_badge(
+                    chat.get(
+                        "active_agent",
+                        None,
+                    )
+                )
+
+                # -----------------------------------
+                # Citations
+                # -----------------------------------
+
                 render_citations(
                     chat.get(
                         "citations",
                         [],
                     )
                 )
+
+                # -----------------------------------
+                # Handover Count
+                # -----------------------------------
+
+                render_handover_count(
+                    chat.get(
+                        "handover_count",
+                        0,
+                    )
+                )
+
+                # -----------------------------------
+                # Trace ID
+                # -----------------------------------
 
                 render_trace_id(
                     chat.get(
@@ -135,9 +277,15 @@ def render_chat_history():
                     )
                 )
 
+                # -----------------------------------
+                # Escalation
+                # -----------------------------------
+
                 if chat.get(
                     "escalation_required",
                     False,
                 ):
 
                     render_escalation_banner()
+
+                render_response_divider()

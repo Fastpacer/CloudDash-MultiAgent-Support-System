@@ -1,19 +1,32 @@
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import (
+    ChatPromptTemplate,
+)
 
-from app.agents.base_agent import BaseAgent
+from app.agents.base_agent import (
+    BaseAgent,
+)
 
 from app.orchestration.state import (
     ConversationState,
-    ConversationMessage,
+    AgentOutput,
 )
 
-from app.retrieval.retriever import retrieve_documents
+from app.retrieval.retriever import (
+    retrieve_documents,
+)
 
-from app.utils.llm_factory import get_llm
-from app.observability.logger import logger
+from app.utils.llm_factory import (
+    get_llm,
+)
+
+from app.observability.logger import (
+    logger,
+)
 
 
-class BillingAgent(BaseAgent):
+class BillingAgent(
+    BaseAgent
+):
 
     def __init__(self):
 
@@ -23,8 +36,9 @@ class BillingAgent(BaseAgent):
 
         self.llm = get_llm()
 
-        self.prompt = ChatPromptTemplate.from_template(
-            """
+        self.prompt = (
+            ChatPromptTemplate.from_template(
+                """
 You are CloudDash Enterprise Billing Support.
 
 Your responsibilities:
@@ -62,6 +76,7 @@ Context:
 User Question:
 {question}
 """
+            )
         )
 
     def process(
@@ -69,20 +84,31 @@ User Question:
         state: ConversationState,
     ) -> ConversationState:
 
-        query = state.messages[-1].content
+        # ---------------------------------------------------
+        # User Query
+        # ---------------------------------------------------
+
+        query = (
+            state.messages[-1]
+            .content
+        )
 
         logger.info(
             "billing_agent_started",
-            trace_id=state.trace_id,
+            trace_id=(
+                state.trace_id
+            ),
         )
 
         # ---------------------------------------------------
         # Hybrid Retrieval
         # ---------------------------------------------------
 
-        retrieved_docs = retrieve_documents(
-            query=query,
-            top_k=4,
+        retrieved_docs = (
+            retrieve_documents(
+                query=query,
+                top_k=4,
+            )
         )
 
         # ---------------------------------------------------
@@ -91,12 +117,29 @@ User Question:
 
         citations = list(
             {
-                doc["metadata"]["filename"]
-                for doc in retrieved_docs
+                doc["metadata"][
+                    "filename"
+                ]
+                for doc in (
+                    retrieved_docs
+                )
             }
         )
 
-        state.retrieved_docs = citations
+        # ---------------------------------------------------
+        # Shared Retrieval Tracking
+        # ---------------------------------------------------
+
+        for citation in citations:
+
+            if (
+                citation
+                not in state.retrieved_docs
+            ):
+
+                state.retrieved_docs.append(
+                    citation
+                )
 
         # ---------------------------------------------------
         # Context Compression
@@ -105,7 +148,9 @@ User Question:
         context = "\n\n".join(
             [
                 doc["content"][:1200]
-                for doc in retrieved_docs
+                for doc in (
+                    retrieved_docs
+                )
             ]
         )
 
@@ -113,7 +158,10 @@ User Question:
         # LLM Generation
         # ---------------------------------------------------
 
-        chain = self.prompt | self.llm
+        chain = (
+            self.prompt
+            | self.llm
+        )
 
         response = chain.invoke(
             {
@@ -122,36 +170,37 @@ User Question:
             }
         )
 
-        # ---------------------------------------------------
-        # Append Citations To Response
-        # ---------------------------------------------------
-
-        citation_text = "\n\nSources:\n"
-
-        for citation in citations:
-
-            citation_text += f"- {citation}\n"
-
-        final_response = (
+        generated_response = (
             response.content.strip()
-            + citation_text
         )
 
         # ---------------------------------------------------
-        # Append Assistant Response
+        # Structured Agent Output
         # ---------------------------------------------------
 
-        state.messages.append(
-            ConversationMessage(
-                role="assistant",
-                content=final_response,
+        state.agent_outputs.append(
+            AgentOutput(
+                agent_name=(
+                    self.agent_name
+                ),
+                response=(
+                    generated_response
+                ),
+                citations=citations,
             )
         )
 
         logger.info(
             "billing_agent_completed",
-            retrieved_documents=len(retrieved_docs),
-            citations=len(citations),
+            retrieved_documents=len(
+                retrieved_docs
+            ),
+            citations=len(
+                citations
+            ),
+            trace_id=(
+                state.trace_id
+            ),
         )
 
         return state

@@ -1,3 +1,7 @@
+from datetime import (
+    datetime,
+)
+
 from langgraph.graph import (
     StateGraph,
     END,
@@ -49,12 +53,15 @@ escalation_agent = (
 )
 
 AGENT_REGISTRY = {
+
     "technical_agent": (
         technical_agent
     ),
+
     "billing_agent": (
         billing_agent
     ),
+
     "escalation_agent": (
         escalation_agent
     ),
@@ -96,14 +103,16 @@ def workflow_node(
         "triage_agent"
     )
 
-    # -----------------------------------------------
-    # Aggregated Workflow Responses
-    # -----------------------------------------------
+    aggregated_citations = (
+        set()
+    )
 
-    workflow_responses = []
+    escalation_required = (
+        False
+    )
 
     # -----------------------------------------------
-    # Sequential Agent Execution
+    # Sequential Workflow Execution
     # -----------------------------------------------
 
     for agent_name in (
@@ -132,7 +141,7 @@ def workflow_node(
             continue
 
         # -------------------------------------------
-        # Handover Logging
+        # Handover Tracking
         # -------------------------------------------
 
         handover_event = (
@@ -140,12 +149,15 @@ def workflow_node(
                 source_agent=(
                     previous_agent
                 ),
+
                 target_agent=(
                     agent_name
                 ),
+
                 reason=(
                     "workflow_transition"
                 ),
+
                 context_snapshot=(
                     state.messages[-1]
                     .content[:500]
@@ -178,78 +190,156 @@ def workflow_node(
             agent_name
         )
 
-        pre_message_count = len(
-            state.messages
-        )
-
         state = agent.process(
             state
         )
 
         # -------------------------------------------
-        # Extract Newly Generated Messages
+        # Track Workflow Completion
         # -------------------------------------------
 
-        new_messages = (
-            state.messages[
-                pre_message_count:
-            ]
-        )
-
-        for msg in new_messages:
-
-            if msg.role == "assistant":
-
-                formatted_response = (
-                    f"\n\n"
-                    f"=== "
-                    f"{agent_name.upper()} "
-                    f"===\n\n"
-                    f"{msg.content}"
-                )
-
-                workflow_responses.append(
-                    formatted_response
-                )
-
-        # -------------------------------------------
-        # Completed Agent Tracking
-        # -------------------------------------------
-
-        state.completed_agents.append(
+        if (
             agent_name
-        )
+            not in state.completed_agents
+        ):
+
+            state.completed_agents.append(
+                agent_name
+            )
 
         previous_agent = (
             agent_name
         )
 
     # -----------------------------------------------
-    # Final Workflow Synthesis
+    # Aggregate Citations
     # -----------------------------------------------
 
-    if workflow_responses:
+    for output in (
+        state.agent_outputs
+    ):
 
-        combined_response = (
-            "\n".join(
-                workflow_responses
+        for citation in (
+            output.citations
+        ):
+
+            aggregated_citations.add(
+                citation
             )
+
+    # -----------------------------------------------
+    # Escalation Detection
+    # -----------------------------------------------
+
+    if (
+        "escalation_agent"
+        in state.completed_agents
+    ):
+
+        escalation_required = (
+            True
         )
 
-        state.messages.append(
-            ConversationMessage(
-                role="assistant",
-                content=combined_response,
-            )
+    # -----------------------------------------------
+    # Response Synthesis
+    # -----------------------------------------------
+
+    synthesized_sections = []
+
+    for output in (
+        state.agent_outputs
+    ):
+
+        synthesized_sections.append(
+            output.response
         )
+
+    synthesized_response = (
+        "\n\n".join(
+            synthesized_sections
+        )
+    )
+
+    # -----------------------------------------------
+    # Agents Invoked Section
+    # -----------------------------------------------
+
+    agents_section = (
+        "\n\nAgents Invoked:\n"
+    )
+
+    for agent_name in (
+        state.completed_agents
+    ):
+
+        agents_section += (
+            f"- {agent_name}\n"
+        )
+
+    # -----------------------------------------------
+    # Sources Section
+    # -----------------------------------------------
+
+    citations_section = (
+        "\n\nSources:\n"
+    )
+
+    for citation in (
+        aggregated_citations
+    ):
+
+        citations_section += (
+            f"- {citation}\n"
+        )
+
+    # -----------------------------------------------
+    # Final Combined Response
+    # -----------------------------------------------
+
+    final_response = (
+        synthesized_response
+        + agents_section
+        + citations_section
+    )
+
+    # -----------------------------------------------
+    # Final Assistant Message
+    # -----------------------------------------------
+
+    state.messages.append(
+        ConversationMessage(
+            role="assistant",
+            content=final_response,
+        )
+    )
+
+    # -----------------------------------------------
+    # Workflow Metadata
+    # -----------------------------------------------
+
+    state.escalation_required = (
+        escalation_required
+    )
+
+    state.workflow_completed_at = (
+        datetime.utcnow()
+    )
+
+    state.total_handovers = len(
+        state.handover_history
+    )
+
+    state.total_agents_invoked = len(
+        state.completed_agents
+    )
 
     logger.info(
         "workflow_execution_completed",
         completed_agents=(
             state.completed_agents
         ),
-        total_handovers=len(
-            state.handover_history
+        total_handovers=(
+            state.total_handovers
         ),
         trace_id=(
             state.trace_id
